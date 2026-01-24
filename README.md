@@ -85,7 +85,7 @@ The OyoAgro API is a modular monolith REST API designed to digitize and streamli
 
 - Python 3.11+
 - PostgreSQL 13+
-- pip or poetry for dependency management
+- pip or uv for dependency management
 
 ### Installation
 
@@ -1311,6 +1311,613 @@ Manage farm registrations and locations.
 **Delete farm (soft delete)**
 
 **Note:** Cannot delete if farm has crop, livestock, or agro-allied registries.
+
+---
+
+## 🌾 Crops Endpoints (Reference Data)
+
+Manage crop type classifications.
+
+### POST `/crops/`
+**Create new crop type**
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "name": "Maize"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Crop created successfully",
+  "data": {
+    "croptypeid": 1,
+    "name": "Maize",
+    "createdat": "2026-01-24T10:00:00"
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/crops/`
+**Get all crops (paginated)**
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+- `skip`: Pagination offset
+- `limit`: Results limit
+
+---
+
+### GET `/crops/with-counts`
+**Get crops with registry counts**
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "croptypeid": 1,
+      "name": "Maize",
+      "registry_count": 450,
+      "createdat": "2026-01-24T10:00:00"
+    }
+  ],
+  "total": 1,
+  "tag": 1
+}
+```
+
+---
+
+### GET `/crops/{crop_id}/stats`
+**Get crop with statistics**
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "croptypeid": 1,
+    "name": "Maize",
+    "registry_count": 450,
+    "total_area_planted": 2250.5,
+    "total_yield": 56250.0,
+    "createdat": "2026-01-24T10:00:00"
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/crops/search`
+**Search crops by name**
+
+**Query Parameters:**
+- `q`: Search query (min 2 characters)
+
+---
+
+### PUT `/crops/{crop_id}`
+**Update crop**
+
+---
+
+### DELETE `/crops/{crop_id}`
+**Delete crop (soft delete)**
+
+**Note:** Cannot delete if crop has registries.
+
+---
+
+## 🐄 Livestock Endpoints (Reference Data)
+
+Manage livestock type classifications.
+
+### POST `/livestock/`
+**Create new livestock type**
+
+**Request Body:**
+```json
+{
+  "name": "Poultry (Chicken)"
+}
+```
+
+---
+
+### GET `/livestock/`
+**Get all livestock types (paginated)**
+
+---
+
+### GET `/livestock/with-counts`
+**Get livestock types with registry counts**
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "livestocktypeid": 1,
+      "name": "Poultry (Chicken)",
+      "registry_count": 200,
+      "createdat": "2026-01-24T10:00:00"
+    }
+  ],
+  "total": 1,
+  "tag": 1
+}
+```
+
+---
+
+### GET `/livestock/{livestock_id}/stats`
+**Get livestock type with statistics**
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "livestocktypeid": 1,
+    "name": "Poultry (Chicken)",
+    "registry_count": 200,
+    "total_quantity": 10000,
+    "createdat": "2026-01-24T10:00:00"
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/livestock/search`
+**Search livestock types**
+
+---
+
+### PUT `/livestock/{livestock_id}`
+**Update livestock type**
+
+---
+
+### DELETE `/livestock/{livestock_id}`
+**Delete livestock type (soft delete)**
+
+**Note:** Cannot delete if livestock type has registries.
+
+---
+
+## 🏭 Business Types Endpoints (Reference Data)
+
+Manage agro-allied business type classifications.
+
+### POST `/businesstypes/`
+**Create new business type**
+
+**Request Body:**
+```json
+{
+  "name": "Processing"
+}
+```
+
+---
+
+### GET `/businesstypes/`
+**Get all business types (paginated)**
+
+---
+
+### GET `/businesstypes/with-counts`
+**Get business types with registry counts**
+
+---
+
+### GET `/businesstypes/search`
+**Search business types**
+
+---
+
+### PUT `/businesstypes/{businesstype_id}`
+**Update business type**
+
+---
+
+### DELETE `/businesstypes/{businesstype_id}`
+**Delete business type (soft delete)**
+
+---
+
+## 📦 Primary Products Endpoints (Reference Data)
+
+Manage primary product classifications for agro-allied businesses.
+
+### POST `/primaryproducts/`
+**Create new primary product**
+
+**Request Body:**
+```json
+{
+  "name": "Cassava Flour"
+}
+```
+
+---
+
+### GET `/primaryproducts/`
+**Get all primary products (paginated)**
+
+---
+
+### GET `/primaryproducts/with-counts`
+**Get primary products with registry counts**
+
+---
+
+### GET `/primaryproducts/search`
+**Search primary products**
+
+---
+
+### PUT `/primaryproducts/{product_id}`
+**Update primary product**
+
+---
+
+### DELETE `/primaryproducts/{product_id}`
+**Delete primary product (soft delete)**
+
+---
+
+## 📊 Crop Registry Endpoints (Data Collection)
+
+Track crop planting, harvesting, and yield data.
+
+### POST `/cropregistry/`
+**Register crop data**
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "farmid": 1,
+  "seasonid": 1,
+  "croptypeid": 1,
+  "cropvariety": "Oba Super 2",
+  "areaplanted": 5.5,
+  "plantedquantity": 25.0,
+  "plantingdate": "2025-04-15",
+  "harvestdate": "2025-08-20",
+  "areaharvested": 5.0,
+  "yieldquantity": 2500.0
+}
+```
+
+**Validation:**
+- Farm, season, and crop must exist
+- Harvest date must be after planting date
+- Area harvested ≤ area planted
+- Dates must be within season range
+- Farm size: 0-100,000 hectares
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Crop registry created successfully",
+  "data": {
+    "cropregistryid": 1,
+    "farmid": 1,
+    "farmer_name": "John Farmer",
+    "crop_name": "Maize",
+    "cropvariety": "Oba Super 2",
+    "season_name": "2025 Wet Season",
+    "areaplanted": 5.50,
+    "yieldquantity": 2500.00,
+    "status": "Harvested",
+    "createdat": "2026-01-24T10:00:00"
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/cropregistry/`
+**Get all crop registries (paginated)**
+
+**Query Parameters:**
+- `farm_id`: Filter by farm
+- `season_id`: Filter by season
+- `crop_id`: Filter by crop type
+- `farmer_id`: Filter by farmer
+- `skip`: Pagination offset
+- `limit`: Results limit
+
+**Example:** `GET /cropregistry/?season_id=1&crop_id=1`
+
+---
+
+### GET `/cropregistry/statistics`
+**Get crop registry statistics**
+
+**Query Parameters:**
+- `season_id`: Filter by season (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_registries": 450,
+    "total_area_planted": 2250.50,
+    "total_area_harvested": 2100.00,
+    "total_yield": 52500.00,
+    "avg_yield_per_hectare": 25.00,
+    "status_breakdown": {
+      "pending": 50,
+      "planted": 200,
+      "harvested": 200
+    }
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/cropregistry/{registry_id}`
+**Get crop registry by ID with full details**
+
+---
+
+### PUT `/cropregistry/{registry_id}`
+**Update crop registry**
+
+---
+
+### DELETE `/cropregistry/{registry_id}`
+**Delete crop registry (soft delete)**
+
+---
+
+## 🐓 Livestock Registry Endpoints (Data Collection)
+
+Track livestock quantities over time.
+
+### POST `/livestockregistry/`
+**Register livestock data**
+
+**Request Body:**
+```json
+{
+  "farmid": 1,
+  "seasonid": 1,
+  "livestocktypeid": 1,
+  "quantity": 50,
+  "startdate": "2025-04-01",
+  "enddate": "2025-10-31"
+}
+```
+
+**Validation:**
+- Farm, season, and livestock type must exist
+- End date must be after start date
+- Dates must be within season range
+- Quantity must be > 0
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Livestock registry created successfully",
+  "data": {
+    "livestockregistryid": 1,
+    "farmid": 1,
+    "farmer_name": "John Farmer",
+    "livestock_name": "Poultry (Chicken)",
+    "season_name": "2025 Wet Season",
+    "quantity": 50,
+    "startdate": "2025-04-01",
+    "enddate": "2025-10-31",
+    "status": "Active",
+    "createdat": "2026-01-24T10:00:00"
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/livestockregistry/`
+**Get all livestock registries (paginated)**
+
+**Query Parameters:**
+- `farm_id`: Filter by farm
+- `season_id`: Filter by season
+- `livestock_id`: Filter by livestock type
+- `farmer_id`: Filter by farmer
+
+---
+
+### GET `/livestockregistry/statistics`
+**Get livestock registry statistics**
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_registries": 200,
+    "total_quantity": 10000,
+    "avg_quantity_per_registry": 50.00,
+    "status_breakdown": {
+      "active": 150,
+      "completed": 50
+    },
+    "by_livestock_type": {
+      "Poultry (Chicken)": {
+        "count": 100,
+        "total_quantity": 5000
+      },
+      "Cattle": {
+        "count": 50,
+        "total_quantity": 2500
+      },
+      "Goats": {
+        "count": 50,
+        "total_quantity": 2500
+      }
+    }
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/livestockregistry/{registry_id}`
+**Get livestock registry by ID with full details**
+
+---
+
+### PUT `/livestockregistry/{registry_id}`
+**Update livestock registry**
+
+---
+
+### DELETE `/livestockregistry/{registry_id}`
+**Delete livestock registry (soft delete)**
+
+---
+
+## 🏢 Agro-Allied Registry Endpoints (Data Collection)
+
+Track agro-allied business operations.
+
+### POST `/agroalliedregistry/`
+**Register agro-allied business data**
+
+**Request Body:**
+```json
+{
+  "farmid": 1,
+  "seasonid": 1,
+  "businesstypeid": 1,
+  "primaryproducttypeid": 1,
+  "productioncapacity": 1000.0
+}
+```
+
+**Validation:**
+- Farm, season, business type, and primary product must exist
+- Production capacity must be > 0
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Agro-allied registry created successfully",
+  "data": {
+    "agroalliedregistryid": 1,
+    "farmid": 1,
+    "farmer_name": "John Farmer",
+    "season_name": "2025 Wet Season",
+    "business_type_name": "Processing",
+    "primary_product_name": "Cassava Flour",
+    "productioncapacity": 1000.00,
+    "createdat": "2026-01-24T10:00:00"
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/agroalliedregistry/`
+**Get all agro-allied registries (paginated)**
+
+**Query Parameters:**
+- `farm_id`: Filter by farm
+- `season_id`: Filter by season
+- `businesstype_id`: Filter by business type
+- `product_id`: Filter by primary product
+- `farmer_id`: Filter by farmer
+
+---
+
+### GET `/agroalliedregistry/statistics`
+**Get agro-allied registry statistics**
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_registries": 50,
+    "total_production_capacity": 50000.00,
+    "avg_capacity_per_registry": 1000.00,
+    "by_business_type": {
+      "Processing": {
+        "count": 25,
+        "total_capacity": 25000.00
+      },
+      "Storage": {
+        "count": 15,
+        "total_capacity": 15000.00
+      },
+      "Marketing": {
+        "count": 10,
+        "total_capacity": 10000.00
+      }
+    },
+    "by_primary_product": {
+      "Cassava Flour": {
+        "count": 20,
+        "total_capacity": 20000.00
+      },
+      "Palm Oil": {
+        "count": 20,
+        "total_capacity": 20000.00
+      },
+      "Maize Flour": {
+        "count": 10,
+        "total_capacity": 10000.00
+      }
+    }
+  },
+  "tag": 1
+}
+```
+
+---
+
+### GET `/agroalliedregistry/{registry_id}`
+**Get agro-allied registry by ID with full details**
+
+---
+
+### PUT `/agroalliedregistry/{registry_id}`
+**Update agro-allied registry**
+
+---
+
+### DELETE `/agroalliedregistry/{registry_id}`
+**Delete agro-allied registry (soft delete)**
 
 ---
 

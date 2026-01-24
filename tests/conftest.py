@@ -14,7 +14,8 @@ from src.core.security import simple_encrypt, generate_salt
 from src.shared.models import (
     Useraccount, Userprofile, Region, Lga, Association, Season, 
     Crop, Livestock, Farmtype, BusinessType, PrimaryProduct,
-    Farmer, Farm, Address
+    Farmer, Farm, Address,
+    CropRegistry, LivestockRegistry, AgroAlliedRegistry
 )
 
 
@@ -359,6 +360,74 @@ def test_farm_fixture(session: Session, test_farmer: Farmer, test_farmtype: Farm
 
 
 # ============================================================================
+# REGISTRY FIXTURES
+# ============================================================================
+
+@pytest.fixture(name="test_crop_registry")
+def test_crop_registry_fixture(session: Session, test_farm: Farm, test_season: Season, test_crop: Crop):
+    """Create test crop registry"""
+    registry = CropRegistry(
+        cropregistryid=1,
+        farmid=test_farm.farmid,
+        seasonid=test_season.seasonid,
+        croptypeid=test_crop.croptypeid,
+        cropvariety="Oba Super 2",
+        areaplanted=5.5, # type: ignore
+        plantedquantity=25.0, # type: ignore
+        plantingdate=test_season.startdate,
+        createdat=datetime.utcnow(),
+        version=1
+    )
+    session.add(registry)
+    session.commit()
+    session.refresh(registry)
+    return registry
+
+
+@pytest.fixture(name="test_livestock_registry")
+def test_livestock_registry_fixture(session: Session, test_farm: Farm, test_season: Season, test_livestock: Livestock):
+    """Create test livestock registry"""
+    registry = LivestockRegistry(
+        livestockregistryid=1,
+        farmid=test_farm.farmid,
+        seasonid=test_season.seasonid,
+        livestocktypeid=test_livestock.livestocktypeid,
+        quantity=50,
+        startdate=test_season.startdate,
+        createdat=datetime.utcnow(),
+        version=1
+    )
+    session.add(registry)
+    session.commit()
+    session.refresh(registry)
+    return registry
+
+
+@pytest.fixture(name="test_agroallied_registry")
+def test_agroallied_registry_fixture(
+    session: Session, 
+    test_farm: Farm, 
+    test_season: Season, 
+    test_businesstype: BusinessType,
+    test_primaryproduct: PrimaryProduct
+):
+    """Create test agro-allied registry"""
+    registry = AgroAlliedRegistry(
+        agroalliedregistryid=1,
+        farmid=test_farm.farmid,
+        seasonid=test_season.seasonid,
+        businesstypeid=test_businesstype.businesstypeid,
+        primaryproducttypeid=test_primaryproduct.primaryproducttypeid,
+        productioncapacity=1000.0, # type: ignore
+        createdat=datetime.utcnow()
+    )
+    session.add(registry)
+    session.commit()
+    session.refresh(registry)
+    return registry
+
+
+# ============================================================================
 # HELPER FIXTURES
 # ============================================================================
 
@@ -418,6 +487,7 @@ def reset_database(session: Session):
 
 def pytest_configure(config):
     """Configure pytest with custom markers"""
+    # Existing markers
     config.addinivalue_line("markers", "auth: Authentication tests")
     config.addinivalue_line("markers", "associations: Association tests")
     config.addinivalue_line("markers", "regions: Region tests")
@@ -426,5 +496,18 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "farmtypes: Farm type tests")
     config.addinivalue_line("markers", "farmers: Farmer tests")
     config.addinivalue_line("markers", "farms: Farm tests")
+    
+    # New markers for reference data modules
+    config.addinivalue_line("markers", "crops: Crop tests")
+    config.addinivalue_line("markers", "livestock: Livestock tests")
+    config.addinivalue_line("markers", "businesstypes: Business type tests")
+    config.addinivalue_line("markers", "primaryproducts: Primary product tests")
+    
+    # New markers for registry modules
+    config.addinivalue_line("markers", "cropregistry: Crop registry tests")
+    config.addinivalue_line("markers", "livestockregistry: Livestock registry tests")
+    config.addinivalue_line("markers", "agroalliedregistry: Agro-allied registry tests")
+    
+    # General markers
     config.addinivalue_line("markers", "unit: Unit tests")
     config.addinivalue_line("markers", "integration: Integration tests")

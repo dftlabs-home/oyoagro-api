@@ -14,7 +14,7 @@ from src.primaryproducts.schemas import PrimaryProductCreate, PrimaryProductUpda
 router = APIRouter(prefix="/primaryproducts", tags=["Primary Products"])
 
 
-@router.post("/", response_model=ResponseModel)
+@router.post("/create", response_model=ResponseModel)
 async def create_primaryproduct(
     data: PrimaryProductCreate,
     session: Session = Depends(get_session),
