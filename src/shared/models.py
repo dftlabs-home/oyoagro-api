@@ -231,7 +231,7 @@ class AgroAlliedRegistry(TimestampModel, table=True):
     tempclientid: Optional[str] = Field(default=None, nullable=True)
     productioncapacity: Optional[Decimal] = Field(default=None, nullable=True)
 
-
+"""
 # NOTIFICATION MODELS
 class Notification(VersionedModel, table=True):
     __tablename__ = "notification" # type: ignore
@@ -250,7 +250,7 @@ class Notificationtarget(TimestampModel, table=True):
     regionid: Optional[int] = Field(default=None, foreign_key="region.regionid")
     lgaid: Optional[int] = Field(default=None, foreign_key="lga.lgaid")
     userid: Optional[int] = Field(default=None, foreign_key="useraccount.userid")
-
+"""
 
 # PERMISSION MODELS
 class Profileactivityparent(TimestampModel, table=True):

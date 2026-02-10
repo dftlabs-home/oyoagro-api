@@ -198,6 +198,26 @@ try:
 except ImportError:
     logger.warning("⚠️  Agro-Allied Registry router not found")
 
+try:
+    from src.notifications.router import router as notifications_router
+    app.include_router(notifications_router, prefix=settings.API_V1_PREFIX, tags=["Notifications"])
+    logger.info("✅ Notifications router registered")
+except ImportError:
+    logger.warning("⚠️  Notifications router not found")
+
+try:
+    from src.dashboard.router import router as dashboard_router
+    app.include_router(dashboard_router, prefix=settings.API_V1_PREFIX, tags=["Dashboard"])
+    logger.info("✅ Dashboard router registered")
+except ImportError:
+    logger.warning("⚠️  Dashboard router not found")
+
+try:
+    from src.admin.router import router as admin_router
+    app.include_router(admin_router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
+    logger.info("✅ Admin router registered")
+except ImportError:
+    logger.warning("⚠️  Admin router not found")
 
 if __name__ == "__main__":
     import uvicorn

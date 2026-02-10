@@ -517,6 +517,376 @@ Maintains C# response format:
 }
 ```
 
+# Auth Router Email Integration - Complete ✅
+
+## 📧 Email Integration Summary
+
+Updated `src/auth/router.py` with complete email service integration for all authentication workflows.
+
+---
+
+## 🎯 Email Triggers (4 Scenarios)
+
+### 1. **Welcome Email** (New Officer Registration)
+**Trigger:** Admin creates new officer account via `/auth/register`
+
+**When:**
+- After successful user account creation
+- After all database records created (user, profile, address, user-region)
+
+**Contains:**
+- Username
+- Temporary password
+- Login link
+- Security instructions
+- LGA assignment info
+
+**Code Location:** Line ~285 in `register_user()`
+```python
+welcome_email_data = WelcomeEmailData(...)
+await EmailService.send_welcome_email(welcome_email_data)
+```
+
+---
+
+### 2. **Password Reset Email**
+**Trigger:** User requests password reset via `/auth/forgot-password`
+
+**When:**
+- After reset token generated
+- User exists and account is active
+
+**Contains:**
+- Reset link with token
+- Token expiration time (24 hours)
+- Security warnings
+- Password requirements
+
+**Code Location:** Line ~175 in `forgot_password()`
+```python
+reset_email_data = PasswordResetEmailData(...)
+await EmailService.send_password_reset_email(reset_email_data)
+```
+
+---
+
+### 3. **Password Changed Confirmation Email** (2 sources)
+
+#### Source A: Password Reset Flow
+**Trigger:** User completes password reset via `/auth/reset-password`
+
+**When:**
+- After password successfully updated via reset token
+- Token validated and marked as used
+
+**Code Location:** Line ~235 in `reset_password()`
+
+#### Source B: Manual Password Change
+**Trigger:** Logged-in user changes password via `/auth/change-password`
+
+**When:**
+- After password successfully changed
+- Current password verified
+
+**Code Location:** Line ~430 in `change_password()`
+
+**Contains:**
+- Confirmation of password change
+- Timestamp of change
+- Security alert
+- Login link
+
+---
+
+### 4. **Account Locked Notification Email** (2 sources)
+
+#### Source A: Failed Login Attempts
+**Trigger:** Account locks after 5 failed login attempts via `/auth/login`
+
+**When:**
+- Login fails with 403 status
+- "locked" keyword in error message
+- Account was just locked by system
+
+**Code Location:** Line ~65 in `login()` (exception handler)
+
+#### Source B: Admin Action
+**Trigger:** Admin manually locks account via `/auth/lock-account/{user_id}`
+
+**When:**
+- Admin explicitly locks a user account
+- Account status updated to locked
+
+**Code Location:** Line ~490 in `lock_account()`
+
+**Contains:**
+- Lock reason (failed attempts or admin action)
+- Lock timestamp
+- Unlock instructions
+- Security tips
+
+---
+
+## 📊 Email Flow Diagram
+
+```
+┌─────────────────┐
+│  Auth Router    │
+│   Endpoints     │
+└────────┬────────┘
+         │
+         ├─── /register ────────────────┐
+         │                              ▼
+         │                    ┌──────────────────┐
+         │                    │  Welcome Email   │
+         │                    └──────────────────┘
+         │
+         ├─── /forgot-password ─────────┐
+         │                              ▼
+         │                    ┌──────────────────┐
+         │                    │ Reset Email      │
+         │                    └──────────────────┘
+         │
+         ├─── /reset-password ──────────┐
+         │                              ▼
+         │                    ┌──────────────────┐
+         │                    │ Changed Email    │
+         │                    └──────────────────┘
+         │
+         ├─── /change-password ─────────┘
+         │
+         ├─── /login (on lock) ─────────┐
+         │                              ▼
+         ├─── /lock-account ────────────┤
+         │                    ┌──────────────────┐
+         └────────────────────│  Locked Email    │
+                              └──────────────────┘
+```
+
+---
+
+## 🔧 Key Changes Made
+
+### 1. **Imports Added**
+```python
+from src.email.service import EmailService
+from src.email.schemas import (
+    WelcomeEmailData,
+    PasswordResetEmailData,
+    PasswordChangedEmailData,
+    AccountLockedEmailData
+)
+```
+
+### 2. **Login Endpoint Enhancement**
+- Added try-catch block
+- Detects account locking
+- Sends lock notification email
+- Preserves original error behavior
+
+### 3. **Password Reset Flow**
+- Fetches user info before reset
+- Sends confirmation email after successful reset
+- Logs email sending status
+
+### 4. **User Registration**
+- Sends welcome email with credentials
+- Includes development mode flag
+- Returns email send status in dev mode
+
+### 5. **Password Change Endpoint**
+- Sends confirmation email
+- Gets user profile for firstname
+- Comprehensive logging
+
+### 6. **Admin Lock Account**
+- Sends notification to locked user
+- Includes lock reason
+- Logs admin action
+
+---
+
+## ✅ Error Handling
+
+All email operations include:
+```python
+email_response = await EmailService.send_email(...)
+
+if not email_response.success:
+    logger.error(f"Failed to send email: {email_response.error}")
+else:
+    logger.info(f"Email sent to: {email}")
+```
+
+**Non-blocking:** Email failures don't prevent authentication operations from completing.
+
+---
+
+## 🧪 Testing
+
+### Development Mode
+```env
+SEND_EMAILS=False
+```
+- Emails logged but not sent
+- Credentials shown in API response
+- Useful for testing
+
+### Production Mode
+```env
+SEND_EMAILS=True
+MAIL_SERVER=smtp.gmail.com
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+```
+- Emails actually sent
+- Credentials NOT in API response
+- Real SMTP delivery
+
+---
+
+## 📝 Usage Examples
+
+### 1. Register New Officer (sends welcome email)
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstname": "John",
+    "lastname": "Doe",
+    "emailAddress": "john.doe@oyoagro.gov.ng",
+    "phonenumber": "08012345678",
+    "lgaid": 1,
+    "regionid": 1,
+    "streetaddress": "123 Main St",
+    "town": "Ibadan",
+    "postalcode": "200001"
+  }'
+```
+
+**Response (Development):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully. Login credentials sent to email.",
+  "data": {
+    "userid": 5,
+    "username": "john.doe",
+    "email": "john.doe@oyoagro.gov.ng",
+    "temp_password": "TempPass123",
+    "email_sent": true
+  }
+}
+```
+
+### 2. Request Password Reset (sends reset email)
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/forgot-password" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john.doe@oyoagro.gov.ng"}'
+```
+
+**Email Received:**
+- Subject: "Password Reset Request - Oyo Agro System"
+- Contains reset link with token
+- Expires in 24 hours
+
+### 3. Change Password (sends confirmation email)
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/change-password" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_password": "OldPass123",
+    "new_password": "NewPass456"
+  }'
+```
+
+**Email Received:**
+- Subject: "Password Changed Successfully - Oyo Agro System"
+- Confirms password change
+- Security alert if not user's action
+
+---
+
+## 🔍 Logging
+
+All email operations logged:
+
+```
+INFO: Welcome email sent to: john.doe@oyoagro.gov.ng
+INFO: Password reset email sent to: user@example.com
+ERROR: Failed to send password changed email: SMTP auth failed
+INFO: Account locked notification sent to: locked.user@example.com
+```
+
+---
+
+## 🛡️ Security Features
+
+1. **Non-blocking emails**
+   - Auth operations complete even if email fails
+   - Email failures logged but don't prevent login/registration
+
+2. **Development vs Production**
+   - Dev: Credentials in response for testing
+   - Prod: Credentials only via email
+
+3. **Email validation**
+   - All email addresses validated by Pydantic
+   - Type-safe email data models
+
+4. **Error isolation**
+   - Email errors don't crash endpoints
+   - Comprehensive error logging
+
+---
+
+## 📋 Checklist
+
+Installation:
+- [ ] Copy `auth_router_final.py` to `src/auth/router.py`
+- [ ] Ensure email module installed (`src/email/`)
+- [ ] Configure email settings in `.env`
+- [ ] Test email configuration
+
+Testing:
+- [ ] Test new user registration (welcome email)
+- [ ] Test password reset flow (reset email)
+- [ ] Test password change (confirmation email)
+- [ ] Test account locking (lock notification)
+- [ ] Verify emails arrive correctly
+
+Production:
+- [ ] Set `SEND_EMAILS=True`
+- [ ] Configure production SMTP
+- [ ] Test email delivery
+- [ ] Monitor email logs
+
+---
+
+## 🎉 Summary
+
+**Updated Endpoints:** 6
+- `/auth/login` - Added lock notification
+- `/auth/forgot-password` - Added reset email
+- `/auth/reset-password` - Added confirmation email
+- `/auth/register` - Added welcome email
+- `/auth/change-password` - Added confirmation email
+- `/auth/lock-account/{user_id}` - Added lock notification
+
+**Email Scenarios:** 4
+1. Welcome (new user)
+2. Password reset
+3. Password changed
+4. Account locked
+
+
+
+---
+
+
 ## Best Practices
 
 ### 1. Security

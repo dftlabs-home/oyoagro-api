@@ -51,14 +51,15 @@ def create_db_and_tables():
             # Data collection models
             Season, Crop, CropRegistry, Livestock, LivestockRegistry,
             BusinessType, PrimaryProduct, AgroAlliedRegistry,
-            # Notification models
-            Notification, Notificationtarget,
             # Permission models
             Profileactivityparent, Profileactivity, Profileadditionalactivity,
             # Other models
             Dashboardmetrics, Role, Synclog
         )
         
+        from src.notifications.models import (
+            Notification, Broadcast
+        )
         # Create all tables
         SQLModel.metadata.create_all(engine)
         
