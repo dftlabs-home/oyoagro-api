@@ -5,7 +5,18 @@ Core configuration module for OyoAgro API
 from functools import lru_cache
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+from dotenv import load_dotenv
+import psycopg2
 
+
+def get_dburl():
+    db_user = os.getenv("DB_USER", "postgres") 
+    db_password = os.getenv("DB_PASSWORD", "P@ssword@123") 
+    host = os.getenv("DB_PASSWORD", "localhost") 
+    port = os.getenv("DB_PORT", "5432") 
+    db_name = os.getenv("DB_NAME", "oyoagrodb") 
+    return f"postgresql://{db_user}:{db_password}@{host}:{port}/{db_name}"
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -24,10 +35,10 @@ class Settings(BaseSettings):
     RELOAD: bool = True
     
     # Database
-    DATABASE_URL: str = "postgresql://postgres:P%40ssword%40123@localhost:5432/oyoagrodb"
-    DB_ECHO: bool = False
+    DATABASE_URL: str = get_dburl() # P%40ssword%40123
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 0
+    DB_ECHO: bool = True
     
     # JWT
     JWT_SECRET_KEY: str = "IqwK9N7EuBOE7PxbOcWsH1jycwdJIqfemtadEtu6Tp8"
