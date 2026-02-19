@@ -1,6 +1,6 @@
 """
 FILE: src/email/schemas.py
-Email data schemas for type safety
+Email data schemas for type safety - Aligned with Resend service
 """
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -44,8 +44,8 @@ class AccountLockedEmailData(BaseModel):
 
 
 class EmailResponse(BaseModel):
-    """Standard email service response"""
+    """Standard email service response - Aligned with Resend"""
     success: bool
     message: str
-    email_sent_to: Optional[EmailStr] = None
+    email_id: Optional[str] = None  # Resend email ID
     error: Optional[str] = None

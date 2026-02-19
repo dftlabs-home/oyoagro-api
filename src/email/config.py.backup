@@ -1,0 +1,45 @@
+"""
+FILE: src/email/config.py
+Email service configuration
+"""
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
+import os
+
+
+class EmailSettings(BaseSettings):
+    """Email service configuration settings"""
+    
+    # SMTP Configuration
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = "noreply@oyoagro.gov.ng"
+    MAIL_FROM_NAME: str = "Oyo Agro System"
+    MAIL_PORT: int = 587
+    MAIL_SERVER: str = "smtp.gmail.com"
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
+    USE_CREDENTIALS: bool = True
+    VALIDATE_CERTS: bool = True
+    
+    # Email Features
+    SEND_EMAILS: bool = False
+    EMAIL_TEMPLATES_DIR: str = "src/email/templates"
+    
+    # Frontend URLs
+    FRONTEND_URL: str = "http://localhost:3000"
+    PASSWORD_RESET_URL: str = "http://localhost:3000/reset-password"
+    LOGIN_URL: str = "http://localhost:3000/login"
+    
+    # Token Expiration
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 24
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"  # FIXED: Ignore extra fields from .env
+    )
+
+
+email_settings = EmailSettings()

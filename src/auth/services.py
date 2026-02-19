@@ -1,8 +1,8 @@
 """
 FILE: src/auth/services.py
-Authentication business logic
+Authentication business logic - Updated to support email/username login
 """
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, or_
 from sqlalchemy import and_
 from src.shared.models import (
     Useraccount, Userprofile, PasswordResetToken,
@@ -40,27 +40,42 @@ class AuthService:
         """
         Authenticate user and return token with user info
         
+        Supports login with either username OR email
+        
         Returns:
             Dict with token and user data
             
         Raises:
             HTTPException: On authentication failure
         """
-        # Find user
-        user = session.exec(
-            select(Useraccount).where(Useraccount.username == credentials.username)
-        ).first()
+        # Find user by username OR email
+        # Check if input looks like an email (contains @)
+        login_identifier = credentials.username
+        is_email = '@' in login_identifier
+        
+        if is_email:
+            # Search by email
+            user = session.exec(
+                select(Useraccount).where(Useraccount.email == login_identifier)
+            ).first()
+            logger.info(f"Login attempt with email: {login_identifier}")
+        else:
+            # Search by username
+            user = session.exec(
+                select(Useraccount).where(Useraccount.username == login_identifier)
+            ).first()
+            logger.info(f"Login attempt with username: {login_identifier}")
         
         if not user:
-            logger.warning(f"Login attempt - invalid username: {credentials.username}")
+            logger.warning(f"Login attempt - invalid credential: {login_identifier}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password"
+                detail="Invalid username/email or password"
             )
         
         # Check account locked
         if user.islocked:
-            logger.warning(f"Login attempt - locked account: {credentials.username}")
+            logger.warning(f"Login attempt - locked account: {login_identifier}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is locked. Contact administrator."
@@ -68,7 +83,7 @@ class AuthService:
         
         # Check account status
         if user.status != 1:
-            logger.warning(f"Login attempt - inactive account: {credentials.username}")
+            logger.warning(f"Login attempt - inactive account: {login_identifier}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is disabled"
@@ -78,7 +93,7 @@ class AuthService:
         if not user.passwordhash or not user.salt:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password"
+                detail="Invalid username/email or password"
             )
         
         try:
@@ -93,7 +108,7 @@ class AuthService:
                     user.islocked = True
                     session.add(user)
                     session.commit()
-                    logger.warning(f"Account locked - too many failed attempts: {credentials.username}")
+                    logger.warning(f"Account locked - too many failed attempts: {login_identifier}")
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="Account locked due to multiple failed login attempts"
@@ -103,12 +118,12 @@ class AuthService:
                 session.commit()
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid username or password"
+                    detail="Invalid username/email or password"
                 )
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password"
+                detail="Invalid username/email or password"
             )
         
         # Get profile
@@ -136,7 +151,7 @@ class AuthService:
         session.add(user)
         session.commit()
         
-        logger.info(f"Successful login: {credentials.username}")
+        logger.info(f"Successful login: {user.username} (via {('email' if is_email else 'username')})")
         
         return {
             "token": access_token,

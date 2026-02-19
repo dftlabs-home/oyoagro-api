@@ -3,6 +3,8 @@
 ## Overview
 The OyoAgro API authentication system provides secure user authentication, password management, and user registration capabilities. It maintains compatibility with the legacy C# .NET system while implementing modern security best practices.
 
+**✨ NEW: Login with Email or Username Support**
+
 ## Table of Contents
 1. [Architecture](#architecture)
 2. [Endpoints](#endpoints)
@@ -11,6 +13,7 @@ The OyoAgro API authentication system provides secure user authentication, passw
 5. [Implementation Details](#implementation-details)
 6. [Testing](#testing)
 7. [Migration from C#](#migration-from-c)
+8. [Email/Username Login Feature](#emailusername-login-feature)
 
 ## Architecture
 
@@ -42,11 +45,31 @@ User Request → FastAPI Router → Security Layer → Database
 
 Authenticates user and returns JWT token.
 
+**✨ NEW: Supports login with EITHER username OR email**
+
 **Request:**
 ```json
 {
-  "username": "string",
+  "username": "string",  // Can be username OR email
   "password": "string"
+}
+```
+
+**Examples:**
+
+Login with username:
+```json
+{
+  "username": "officer1",
+  "password": "SecurePass123"
+}
+```
+
+Login with email:
+```json
+{
+  "username": "officer1@oyoagro.gov.ng",  // Email in username field
+  "password": "SecurePass123"
 }
 ```
 
@@ -71,12 +94,13 @@ Authenticates user and returns JWT token.
 ```
 
 **Error Responses:**
-- `401 Unauthorized`: Invalid credentials
+- `401 Unauthorized`: Invalid credentials (username/email or password)
 - `403 Forbidden`: Account locked or disabled
 
 **Features:**
+- **Auto-detection**: Automatically detects if input is email (contains @) or username
 - Account locking after 5 failed attempts
-- Failed attempt tracking
+- Failed attempt tracking (works for both email and username attempts)
 - Login count tracking
 - Last login date tracking
 - JWT token generation
@@ -333,10 +357,11 @@ JWT_AUDIENCE: str = "oyoagro-frontend"
 ```
 
 ### 3. Account Security
-- **Failed Login Tracking**: Counts failed attempts
+- **Failed Login Tracking**: Counts failed attempts (both email and username)
 - **Account Locking**: Automatic after 5 failed attempts
 - **Token Invalidation**: On logout and password reset
 - **Password Reset Tokens**: Time-limited, single-use
+- **Email/Username Flexibility**: Login with either credential type
 
 ### 4. Input Validation
 All inputs validated using Pydantic schemas:
@@ -345,13 +370,155 @@ All inputs validated using Pydantic schemas:
 - Phone number format (11 digits)
 - Required fields enforcement
 
+## Email/Username Login Feature
+
+### How It Works
+
+The login system now supports both username and email authentication through a single endpoint.
+
+**Detection Logic:**
+1. Check if input contains `@` character
+2. If yes → search by email
+3. If no → search by username
+
+**Implementation:**
+```python
+# In AuthService.authenticate_user()
+login_identifier = credentials.username
+is_email = '@' in login_identifier
+
+if is_email:
+    user = session.exec(
+        select(Useraccount).where(Useraccount.email == login_identifier)
+    ).first()
+else:
+    user = session.exec(
+        select(Useraccount).where(Useraccount.username == login_identifier)
+    ).first()
+```
+
+### Usage Examples
+
+**Example 1: Login with Username**
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "officer1",
+    "password": "SecurePass123"
+  }'
+```
+
+**Example 2: Login with Email**
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "officer1@oyoagro.gov.ng",
+    "password": "SecurePass123"
+  }'
+```
+
+**Example 3: Failed Login (Invalid Email)**
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "nonexistent@example.com",
+    "password": "AnyPassword"
+  }'
+
+# Response:
+{
+  "detail": "Invalid username/email or password"
+}
+```
+
+### Error Messages
+
+Unified error messages for better security:
+- ❌ Old: "Invalid username or password"
+- ✅ New: "Invalid username/email or password"
+
+This prevents attackers from determining if a username/email exists.
+
+### Testing
+
+**Unit Tests Added:**
+```python
+# Test login with username
+def test_login_with_username_success(...)
+
+# Test login with email  
+def test_login_with_email_success(...)
+
+# Test invalid email
+def test_login_invalid_email(...)
+
+# Test failed attempts with email
+def test_login_account_locks_after_failed_attempts_with_email(...)
+
+# Test locked account with email
+def test_login_locked_account_with_email(...)
+```
+
+**Total Auth Tests: 35+ comprehensive tests**
+
+### Logging
+
+Enhanced logging shows login method:
+```python
+logger.info(f"Successful login: {user.username} (via {'email' if is_email else 'username'})")
+```
+
+**Example Logs:**
+```
+INFO: Login attempt with email: officer1@oyoagro.gov.ng
+INFO: Successful login: officer1 (via email)
+
+INFO: Login attempt with username: officer1
+INFO: Successful login: officer1 (via username)
+```
+
+### Frontend Integration
+
+The frontend can now offer flexible login:
+
+```javascript
+// Login form - single field for username OR email
+const login = async (identifier, password) => {
+  const response = await fetch('/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: identifier,  // Can be email or username
+      password: password
+    })
+  });
+  
+  return response.json();
+};
+
+// Usage
+login('officer1@example.com', 'password');  // Email
+login('officer1', 'password');              // Username
+```
+
+### Backward Compatibility
+
+✅ **Fully backward compatible**
+- Existing username-based logins continue to work
+- No changes required to existing frontend code
+- No database schema changes needed
+- Email login is an additional feature, not a replacement
+
 ## Database Schema
 
 ### useraccount Table
 ```sql
 userid              INTEGER PRIMARY KEY
 username            VARCHAR UNIQUE
-email               VARCHAR UNIQUE
+email               VARCHAR UNIQUE  -- ✨ Used for email login
 passwordhash        TEXT
 salt                TEXT
 status              INTEGER  -- 1=active, 0=inactive
@@ -360,42 +527,12 @@ islocked            BOOLEAN
 apitoken            TEXT
 logincount          INTEGER
 lastlogindate       DATE
-failedloginattempt  INTEGER
+failedloginattempt  INTEGER  -- Tracks failures for BOTH email and username
 passwordresettoken  TEXT
 passwordresettokenexpires TIMESTAMP
 createdat           TIMESTAMP
 updatedat           TIMESTAMP
 lgaid               INTEGER FK
-```
-
-### userprofile Table
-```sql
-userprofileid   INTEGER PRIMARY KEY
-userid          INTEGER FK -> useraccount
-firstname       VARCHAR
-middlename      VARCHAR
-lastname        VARCHAR
-gender          VARCHAR
-email           VARCHAR
-phonenumber     VARCHAR
-designation     VARCHAR
-roleid          INTEGER
-lgaid           INTEGER
-createdat       TIMESTAMP
-updatedat       TIMESTAMP
-```
-
-### passwordresettokens Table
-```sql
-id          INTEGER PRIMARY KEY
-userid      INTEGER FK -> useraccount
-token       VARCHAR
-expiresat   TIMESTAMP
-isused      BOOLEAN
-usedat      TIMESTAMP
-ipaddress   VARCHAR
-useragent   VARCHAR
-createdat   TIMESTAMP
 ```
 
 ## Implementation Details
@@ -432,7 +569,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-logger.info("Successful login: username")
+logger.info("Successful login: username (via email)")
 logger.warning("Login attempt for locked account")
 logger.error("Login error: error_message")
 ```
@@ -445,6 +582,8 @@ logger.error("Login error: error_message")
 - ✅ All failure scenarios
 - ✅ Edge cases
 - ✅ Security validations
+- ✅ **NEW: Email login scenarios**
+- ✅ **NEW: Mixed credential type scenarios**
 
 ### Running Tests
 ```bash
@@ -452,7 +591,7 @@ logger.error("Login error: error_message")
 pytest tests/test_auth.py -v
 
 # Specific test
-pytest tests/test_auth.py::TestLogin::test_login_success
+pytest tests/test_auth.py::TestLogin::test_login_with_email_success
 
 # With coverage
 pytest tests/test_auth.py --cov=src.auth
@@ -462,14 +601,14 @@ pytest tests/test_auth.py --cov=src.auth
 ```python
 @pytest.fixture
 def test_user(session):
-    """Create test user"""
+    """Create test user with both username and email"""
     # ... setup
     return user
 
 @pytest.fixture
 def auth_token(client, test_user):
-    """Get auth token"""
-    # ... login and return token
+    """Get auth token via email login"""
+    # ... login with email and return token
     return token
 ```
 
@@ -505,6 +644,7 @@ def simple_encrypt(plain_text: str, key: str) -> str:
 1. **No schema changes required** - Uses existing database
 2. **Password migration** - Passwords work without reset
 3. **Data migration** - All existing data accessible
+4. **✨ NEW: Email support** - Leverages existing email field
 
 ### API Compatibility
 Maintains C# response format:
@@ -517,376 +657,6 @@ Maintains C# response format:
 }
 ```
 
-# Auth Router Email Integration - Complete ✅
-
-## 📧 Email Integration Summary
-
-Updated `src/auth/router.py` with complete email service integration for all authentication workflows.
-
----
-
-## 🎯 Email Triggers (4 Scenarios)
-
-### 1. **Welcome Email** (New Officer Registration)
-**Trigger:** Admin creates new officer account via `/auth/register`
-
-**When:**
-- After successful user account creation
-- After all database records created (user, profile, address, user-region)
-
-**Contains:**
-- Username
-- Temporary password
-- Login link
-- Security instructions
-- LGA assignment info
-
-**Code Location:** Line ~285 in `register_user()`
-```python
-welcome_email_data = WelcomeEmailData(...)
-await EmailService.send_welcome_email(welcome_email_data)
-```
-
----
-
-### 2. **Password Reset Email**
-**Trigger:** User requests password reset via `/auth/forgot-password`
-
-**When:**
-- After reset token generated
-- User exists and account is active
-
-**Contains:**
-- Reset link with token
-- Token expiration time (24 hours)
-- Security warnings
-- Password requirements
-
-**Code Location:** Line ~175 in `forgot_password()`
-```python
-reset_email_data = PasswordResetEmailData(...)
-await EmailService.send_password_reset_email(reset_email_data)
-```
-
----
-
-### 3. **Password Changed Confirmation Email** (2 sources)
-
-#### Source A: Password Reset Flow
-**Trigger:** User completes password reset via `/auth/reset-password`
-
-**When:**
-- After password successfully updated via reset token
-- Token validated and marked as used
-
-**Code Location:** Line ~235 in `reset_password()`
-
-#### Source B: Manual Password Change
-**Trigger:** Logged-in user changes password via `/auth/change-password`
-
-**When:**
-- After password successfully changed
-- Current password verified
-
-**Code Location:** Line ~430 in `change_password()`
-
-**Contains:**
-- Confirmation of password change
-- Timestamp of change
-- Security alert
-- Login link
-
----
-
-### 4. **Account Locked Notification Email** (2 sources)
-
-#### Source A: Failed Login Attempts
-**Trigger:** Account locks after 5 failed login attempts via `/auth/login`
-
-**When:**
-- Login fails with 403 status
-- "locked" keyword in error message
-- Account was just locked by system
-
-**Code Location:** Line ~65 in `login()` (exception handler)
-
-#### Source B: Admin Action
-**Trigger:** Admin manually locks account via `/auth/lock-account/{user_id}`
-
-**When:**
-- Admin explicitly locks a user account
-- Account status updated to locked
-
-**Code Location:** Line ~490 in `lock_account()`
-
-**Contains:**
-- Lock reason (failed attempts or admin action)
-- Lock timestamp
-- Unlock instructions
-- Security tips
-
----
-
-## 📊 Email Flow Diagram
-
-```
-┌─────────────────┐
-│  Auth Router    │
-│   Endpoints     │
-└────────┬────────┘
-         │
-         ├─── /register ────────────────┐
-         │                              ▼
-         │                    ┌──────────────────┐
-         │                    │  Welcome Email   │
-         │                    └──────────────────┘
-         │
-         ├─── /forgot-password ─────────┐
-         │                              ▼
-         │                    ┌──────────────────┐
-         │                    │ Reset Email      │
-         │                    └──────────────────┘
-         │
-         ├─── /reset-password ──────────┐
-         │                              ▼
-         │                    ┌──────────────────┐
-         │                    │ Changed Email    │
-         │                    └──────────────────┘
-         │
-         ├─── /change-password ─────────┘
-         │
-         ├─── /login (on lock) ─────────┐
-         │                              ▼
-         ├─── /lock-account ────────────┤
-         │                    ┌──────────────────┐
-         └────────────────────│  Locked Email    │
-                              └──────────────────┘
-```
-
----
-
-## 🔧 Key Changes Made
-
-### 1. **Imports Added**
-```python
-from src.email.service import EmailService
-from src.email.schemas import (
-    WelcomeEmailData,
-    PasswordResetEmailData,
-    PasswordChangedEmailData,
-    AccountLockedEmailData
-)
-```
-
-### 2. **Login Endpoint Enhancement**
-- Added try-catch block
-- Detects account locking
-- Sends lock notification email
-- Preserves original error behavior
-
-### 3. **Password Reset Flow**
-- Fetches user info before reset
-- Sends confirmation email after successful reset
-- Logs email sending status
-
-### 4. **User Registration**
-- Sends welcome email with credentials
-- Includes development mode flag
-- Returns email send status in dev mode
-
-### 5. **Password Change Endpoint**
-- Sends confirmation email
-- Gets user profile for firstname
-- Comprehensive logging
-
-### 6. **Admin Lock Account**
-- Sends notification to locked user
-- Includes lock reason
-- Logs admin action
-
----
-
-## ✅ Error Handling
-
-All email operations include:
-```python
-email_response = await EmailService.send_email(...)
-
-if not email_response.success:
-    logger.error(f"Failed to send email: {email_response.error}")
-else:
-    logger.info(f"Email sent to: {email}")
-```
-
-**Non-blocking:** Email failures don't prevent authentication operations from completing.
-
----
-
-## 🧪 Testing
-
-### Development Mode
-```env
-SEND_EMAILS=False
-```
-- Emails logged but not sent
-- Credentials shown in API response
-- Useful for testing
-
-### Production Mode
-```env
-SEND_EMAILS=True
-MAIL_SERVER=smtp.gmail.com
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
-```
-- Emails actually sent
-- Credentials NOT in API response
-- Real SMTP delivery
-
----
-
-## 📝 Usage Examples
-
-### 1. Register New Officer (sends welcome email)
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
-  -H "Authorization: Bearer <admin_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstname": "John",
-    "lastname": "Doe",
-    "emailAddress": "john.doe@oyoagro.gov.ng",
-    "phonenumber": "08012345678",
-    "lgaid": 1,
-    "regionid": 1,
-    "streetaddress": "123 Main St",
-    "town": "Ibadan",
-    "postalcode": "200001"
-  }'
-```
-
-**Response (Development):**
-```json
-{
-  "success": true,
-  "message": "User registered successfully. Login credentials sent to email.",
-  "data": {
-    "userid": 5,
-    "username": "john.doe",
-    "email": "john.doe@oyoagro.gov.ng",
-    "temp_password": "TempPass123",
-    "email_sent": true
-  }
-}
-```
-
-### 2. Request Password Reset (sends reset email)
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/forgot-password" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "john.doe@oyoagro.gov.ng"}'
-```
-
-**Email Received:**
-- Subject: "Password Reset Request - Oyo Agro System"
-- Contains reset link with token
-- Expires in 24 hours
-
-### 3. Change Password (sends confirmation email)
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/change-password" \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "current_password": "OldPass123",
-    "new_password": "NewPass456"
-  }'
-```
-
-**Email Received:**
-- Subject: "Password Changed Successfully - Oyo Agro System"
-- Confirms password change
-- Security alert if not user's action
-
----
-
-## 🔍 Logging
-
-All email operations logged:
-
-```
-INFO: Welcome email sent to: john.doe@oyoagro.gov.ng
-INFO: Password reset email sent to: user@example.com
-ERROR: Failed to send password changed email: SMTP auth failed
-INFO: Account locked notification sent to: locked.user@example.com
-```
-
----
-
-## 🛡️ Security Features
-
-1. **Non-blocking emails**
-   - Auth operations complete even if email fails
-   - Email failures logged but don't prevent login/registration
-
-2. **Development vs Production**
-   - Dev: Credentials in response for testing
-   - Prod: Credentials only via email
-
-3. **Email validation**
-   - All email addresses validated by Pydantic
-   - Type-safe email data models
-
-4. **Error isolation**
-   - Email errors don't crash endpoints
-   - Comprehensive error logging
-
----
-
-## 📋 Checklist
-
-Installation:
-- [ ] Copy `auth_router_final.py` to `src/auth/router.py`
-- [ ] Ensure email module installed (`src/email/`)
-- [ ] Configure email settings in `.env`
-- [ ] Test email configuration
-
-Testing:
-- [ ] Test new user registration (welcome email)
-- [ ] Test password reset flow (reset email)
-- [ ] Test password change (confirmation email)
-- [ ] Test account locking (lock notification)
-- [ ] Verify emails arrive correctly
-
-Production:
-- [ ] Set `SEND_EMAILS=True`
-- [ ] Configure production SMTP
-- [ ] Test email delivery
-- [ ] Monitor email logs
-
----
-
-## 🎉 Summary
-
-**Updated Endpoints:** 6
-- `/auth/login` - Added lock notification
-- `/auth/forgot-password` - Added reset email
-- `/auth/reset-password` - Added confirmation email
-- `/auth/register` - Added welcome email
-- `/auth/change-password` - Added confirmation email
-- `/auth/lock-account/{user_id}` - Added lock notification
-
-**Email Scenarios:** 4
-1. Welcome (new user)
-2. Password reset
-3. Password changed
-4. Account locked
-
-
-
----
-
-
 ## Best Practices
 
 ### 1. Security
@@ -895,10 +665,11 @@ Production:
 - ✅ Rotate JWT secret regularly
 - ✅ Implement rate limiting
 - ✅ Sanitize all inputs
+- ✅ **NEW: Unified error messages for email/username**
 
 ### 2. Error Messages
 - ✅ Generic messages for auth failures
-- ✅ Don't reveal if email exists
+- ✅ Don't reveal if email/username exists
 - ✅ Log detailed errors server-side
 - ✅ Return user-friendly messages
 
@@ -909,7 +680,7 @@ Production:
 - ✅ Validate token on each request
 
 ### 4. Database
-- ✅ Use indexes on frequently queried fields
+- ✅ Use indexes on frequently queried fields (username, email)
 - ✅ Implement soft deletes
 - ✅ Track audit trail
 - ✅ Use transactions for multi-table operations
@@ -922,6 +693,7 @@ Production:
 - Check if account is locked (`islocked = true`)
 - Check if account is active (`status = 1`)
 - Verify salt matches in database
+- **NEW: Try both username and email**
 
 **2. Token invalid after logout**
 - Expected behavior - token cleared on logout
@@ -935,6 +707,11 @@ Production:
 - Each email must be unique
 - Check for existing users with same email
 
+**5. Email login not working**
+- Verify email exactly matches database (case-sensitive)
+- Check if `@` symbol is present in email
+- Ensure email field is not empty in database
+
 ## Future Enhancements
 
 ### Planned Features
@@ -946,6 +723,7 @@ Production:
 - [ ] Password history
 - [ ] Role-based access control (RBAC)
 - [ ] API rate limiting
+- [x] **Login with email or username** ✅
 
 ### Security Improvements
 - [ ] Bcrypt for new passwords
@@ -953,6 +731,25 @@ Production:
 - [ ] Password complexity requirements
 - [ ] Suspicious activity detection
 - [ ] IP whitelist/blacklist
+
+## Change Log
+
+### Version 2.0 (Current)
+- ✨ **NEW: Login with email or username support**
+- ✨ Enhanced error messages (username/email)
+- ✨ Auto-detection of login credential type
+- ✨ Comprehensive email login tests
+- ✨ Enhanced logging with login method tracking
+- ✅ Backward compatible with existing username login
+- ✅ No database schema changes required
+
+### Version 1.0
+- Initial authentication system
+- Username-based login
+- Password reset functionality
+- JWT token management
+- Admin user registration
+- Email service integration
 
 ## Resources
 
@@ -968,3 +765,9 @@ For questions or issues:
 2. Review test examples
 3. Check application logs
 4. Contact development team
+
+---
+
+**Updated:** February 2026
+**Version:** 2.0
+**Feature:** Email/Username Login Support

@@ -1,6 +1,6 @@
 """
 FILE: tests/test_auth.py
-Comprehensive authentication tests
+Comprehensive authentication tests - Updated with email/username login support
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -142,8 +142,8 @@ def inactive_user_fixture(session: Session, test_lga):
 class TestLogin:
     """Test login endpoint"""
     
-    def test_login_success(self, client: TestClient, test_user: dict):
-        """Test successful login"""
+    def test_login_with_username_success(self, client: TestClient, test_user: dict):
+        """Test successful login with username"""
         response = client.post(
             "/api/v1/auth/login",
             json={
@@ -161,6 +161,25 @@ class TestLogin:
         assert data["data"]["user"]["username"] == "testuser"
         assert data["data"]["user"]["email"] == "test@example.com"
     
+    def test_login_with_email_success(self, client: TestClient, test_user: dict):
+        """Test successful login with email"""
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "test@example.com",  # Using email in username field
+                "password": test_user["password"]
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["tag"] == 1
+        assert "token" in data["data"]
+        assert "user" in data["data"]
+        assert data["data"]["user"]["email"] == "test@example.com"
+        assert data["data"]["user"]["username"] == "testuser"
+    
     def test_login_invalid_username(self, client: TestClient):
         """Test login with invalid username"""
         response = client.post(
@@ -172,10 +191,23 @@ class TestLogin:
         )
         
         assert response.status_code == 401
-        assert "Invalid username or password" in response.json()["detail"]
+        assert "Invalid username/email or password" in response.json()["detail"]
     
-    def test_login_invalid_password(self, client: TestClient, test_user: dict):
-        """Test login with invalid password"""
+    def test_login_invalid_email(self, client: TestClient):
+        """Test login with invalid email"""
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "nonexistent@example.com",
+                "password": "AnyPassword123"
+            }
+        )
+        
+        assert response.status_code == 401
+        assert "Invalid username/email or password" in response.json()["detail"]
+    
+    def test_login_invalid_password_with_username(self, client: TestClient, test_user: dict):
+        """Test login with invalid password using username"""
         response = client.post(
             "/api/v1/auth/login",
             json={
@@ -185,10 +217,36 @@ class TestLogin:
         )
         
         assert response.status_code == 401
-        assert "Invalid username or password" in response.json()["detail"]
+        assert "Invalid username/email or password" in response.json()["detail"]
     
-    def test_login_locked_account(self, client: TestClient, locked_user: dict):
-        """Test login with locked account"""
+    def test_login_invalid_password_with_email(self, client: TestClient, test_user: dict):
+        """Test login with invalid password using email"""
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "test@example.com",
+                "password": "WrongPassword123"
+            }
+        )
+        
+        assert response.status_code == 401
+        assert "Invalid username/email or password" in response.json()["detail"]
+    
+    def test_login_locked_account_with_email(self, client: TestClient, locked_user: dict):
+        """Test login with locked account using email"""
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "locked@example.com",
+                "password": locked_user["password"]
+            }
+        )
+        
+        assert response.status_code == 403
+        assert "locked" in response.json()["detail"].lower()
+    
+    def test_login_locked_account_with_username(self, client: TestClient, locked_user: dict):
+        """Test login with locked account using username"""
         response = client.post(
             "/api/v1/auth/login",
             json={
@@ -213,16 +271,16 @@ class TestLogin:
         assert response.status_code == 403
         assert "disabled" in response.json()["detail"].lower()
     
-    def test_login_account_locks_after_failed_attempts(
+    def test_login_account_locks_after_failed_attempts_with_email(
         self, client: TestClient, test_user: dict, session: Session
     ):
-        """Test account locks after 5 failed login attempts"""
-        # Make 5 failed login attempts
+        """Test account locks after 5 failed login attempts using email"""
+        # Make 5 failed login attempts with email
         for _ in range(5):
             response = client.post(
                 "/api/v1/auth/login",
                 json={
-                    "username": "testuser",
+                    "username": "test@example.com",
                     "password": "WrongPassword"
                 }
             )
@@ -232,7 +290,7 @@ class TestLogin:
         response = client.post(
             "/api/v1/auth/login",
             json={
-                "username": "testuser",
+                "username": "test@example.com",
                 "password": "WrongPassword"
             }
         )
@@ -258,11 +316,11 @@ class TestLogin:
                 }
             )
         
-        # Successful login
+        # Successful login with email
         response = client.post(
             "/api/v1/auth/login",
             json={
-                "username": "testuser",
+                "username": "test@example.com",
                 "password": test_user["password"]
             }
         )
@@ -310,6 +368,19 @@ class TestLogin:
         # Verify user is active
         session.refresh(test_user["user"])
         assert test_user["user"].isactive is True
+    
+    def test_login_with_mixed_case_email(self, client: TestClient, test_user: dict):
+        """Test login with mixed case email (case sensitivity check)"""
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "TEST@example.com",  # Mixed case
+                "password": test_user["password"]
+            }
+        )
+        
+        # Should fail because email comparison is case-sensitive in database
+        assert response.status_code == 401
 
 
 # ============================================================================
@@ -322,11 +393,11 @@ class TestLogout:
     
     def test_logout_success(self, client: TestClient, test_user: dict, session: Session):
         """Test successful logout"""
-        # Login first
+        # Login first with email
         login_response = client.post(
             "/api/v1/auth/login",
             json={
-                "username": "testuser",
+                "username": "test@example.com",
                 "password": test_user["password"]
             }
         )
@@ -466,11 +537,11 @@ class TestPasswordReset:
         assert token_record.isused is True
         assert token_record.usedat is not None
         
-        # Verify can login with new password
+        # Verify can login with new password using email
         login_response = client.post(
             "/api/v1/auth/login",
             json={
-                "username": "testuser",
+                "username": "test@example.com",
                 "password": new_password
             }
         )

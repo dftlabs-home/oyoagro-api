@@ -35,7 +35,7 @@ def create_tables():
         Association, Farmer, Farmtype, Farm,
         Season, Crop, CropRegistry, Livestock, LivestockRegistry,
         BusinessType, PrimaryProduct, AgroAlliedRegistry,
-        Notification, Notificationtarget,
+        #Notification, Notificationtarget,
         Profileactivityparent, Profileactivity, Profileadditionalactivity,
         Dashboardmetrics, Role, Synclog
     )

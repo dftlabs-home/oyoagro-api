@@ -1,6 +1,7 @@
 """
 FILE: tests/conftest.py
 Shared pytest fixtures and configuration for all modules
+Updated for Resend email service
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -589,30 +590,27 @@ def test_user_fixture(session: Session, test_lga, test_region):
 
 
 # ============================================================================
-# EMAIL SERVICE FIXTURES
+# EMAIL SERVICE FIXTURES (Updated for Resend)
 # ============================================================================
 
 @pytest.fixture(name="mock_email_settings")
 def mock_email_settings_fixture():
-    """Mock email settings for testing"""
+    """Mock email settings for testing - Updated for Resend"""
     from src.email.config import email_settings
     
     # Store original values
     original_send = email_settings.SEND_EMAILS
-    original_username = email_settings.MAIL_USERNAME
-    original_password = email_settings.MAIL_PASSWORD
+    original_api_key = email_settings.RESEND_API_KEY
     
     # Set test values
-    email_settings.SEND_EMAILS = False
-    email_settings.MAIL_USERNAME = "test@example.com"
-    email_settings.MAIL_PASSWORD = "test_password"
+    email_settings.SEND_EMAILS = False  # Disable actual sending in tests
+    email_settings.RESEND_API_KEY = "re_8bqfW3Cu_D7B6KM2xNy2kLMToZVyK2TkS"
     
     yield email_settings
     
     # Restore original values
     email_settings.SEND_EMAILS = original_send
-    email_settings.MAIL_USERNAME = original_username
-    email_settings.MAIL_PASSWORD = original_password
+    email_settings.RESEND_API_KEY = original_api_key
 
 
 # ============================================================================
@@ -661,7 +659,7 @@ def test_notifications_fixture(session: Session, officer_user: dict):
         priority=NotificationPriority.HIGH.value,
         title="Notification 3",
         message="Test notification 3",
-        notif_metadata={"test": "data"},  # FIXED: Use notif_metadata
+        notif_metadata={"test": "data"},
         isread=False,
         createdat=datetime.utcnow()
     )
